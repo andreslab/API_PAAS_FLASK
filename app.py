@@ -1,6 +1,7 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+import json
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db_paas.db'
@@ -15,14 +16,14 @@ class Business(db.Model):
     created = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __rep__(self):
-        return '<Task %r>' % self.id
+        return '<Business %r>' % self.name
 
 class Business_type(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
 
     def __rep__(self):
-        return '<Task %r>' % self.id
+        return '<Business_type %r>' % self.name
 
 class Managers(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -33,7 +34,7 @@ class Managers(db.Model):
     created = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __rep__(self):
-        return '<Task %r>' % self.id
+        return '<Managers %r>' % self.name
 
 class Modules(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -43,7 +44,7 @@ class Modules(db.Model):
     created = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __rep__(self):
-        return '<Task %r>' % self.id
+        return '<Modules %r>' % self.name
 
 class Purchased_modules(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -53,7 +54,7 @@ class Purchased_modules(db.Model):
     created = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __rep__(self):
-        return '<Task %r>' % self.id
+        return '<Purchased_modules %r>' % self.id
 
 
 
@@ -65,10 +66,16 @@ def index():
 #devuelve la lista de las empresas asociadas
 @app.route('/api/business/list', methods=['GET'])
 def call_business_list():
-    data = Business.query.all()
-    #data = Business.query.order_by(Business.created).all()
-    #return data
-    return "[{'name': 'andreslab'},{'name': 'coorp'}]"
+    data = Business.query.order_by(Business.created).all()
+    r = []
+    #print(data[0].name)
+    for business in data:
+        d = business.__dict__
+        del d['_sa_instance_state'] #elimina valor
+        d["created"] = str(d["created"]) #convierte valor datetime a string
+        r.append(d)
+    print("\n\nRESULT - ", "call_business_list","\n",r, "\n\n")
+    return json.dumps(r)
 
 #devuelve el detalle de la empresa
 @app.route('/api/business/detail/<int:id>', methods=['GET'])
@@ -78,7 +85,39 @@ def call_business_detail():
 #agrega una nueva empresa
 @app.route('/api/business/add', methods=['POST'])
 def call_business_add():
-    return "call_business_add"
+    if request.method == 'POST':
+        res = request.json
+        print(res)
+
+        manager = res["manager"]
+        data_manager =Managers(
+            name=manager["name"], 
+            last_name=manager["lastName"],
+            phone=manager["phone"],
+            email=manager["email"])
+
+        try:
+            db.session.add(data_manager)
+            #db.session.commit()
+            print('SAVE SUCCESS MANAGER')
+        except:
+            print("SAVE ERROR MANAGER")
+
+        db_manager = Managers.query.order_by(Managers.created).all()
+        
+        data = Business(
+            name=res["name"], 
+            type_id=0,
+            manager_id=db_manager[-1].id)
+        
+        try:
+            db.session.add(data)
+            db.session.commit()
+            return jsonify(result="SAVE SUCCESS")
+        except:
+            return jsonify(result="SAVE ERROR")
+
+    return "ERROR REQUEST"
 
 #devuelve la lista de modulos por empresa
 @app.route('/api/business/list_modules/<int:id>', methods=['GET'])
