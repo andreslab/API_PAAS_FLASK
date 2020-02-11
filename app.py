@@ -2,8 +2,16 @@ from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import json
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
+cors = CORS(app, resouse={
+    r"/*": {
+        "origins": "*"
+    }
+})
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db_paas.db'
 #app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 db = SQLAlchemy(app)
@@ -75,7 +83,7 @@ def call_business_list():
         d["created"] = str(d["created"]) #convierte valor datetime a string
         r.append(d)
     print("\n\nRESULT - ", "call_business_list","\n",r, "\n\n")
-    return json.dumps(r)
+    return jsonify(data=r)
 
 #devuelve el detalle de la empresa
 @app.route('/api/business/detail/<int:id>', methods=['GET'])
