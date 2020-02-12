@@ -21,6 +21,7 @@ class Business(db.Model):
     name = db.Column(db.String(200), nullable=False)
     type_id = db.Column(db.Integer, nullable=False)
     manager_id = db.Column(db.Integer, nullable=False)
+    num_modules = db.Column(db.Integer, default=0)
     created = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __rep__(self):
