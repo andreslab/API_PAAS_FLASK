@@ -48,7 +48,7 @@ class Modules(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     status = db.Column(db.String(200), nullable=False)
-    last_update = db.Column(db.String(200), nullable=False)
+    last_update = db.Column(db.String(200), default=datetime.utcnow)
     created = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __rep__(self):
@@ -64,6 +64,15 @@ class Purchased_modules(db.Model):
     def __rep__(self):
         return '<Purchased_modules %r>' % self.id
 
+class Template(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    status = db.Column(db.String(200), nullable=False)
+    last_update = db.Column(db.String(200), default=datetime.utcnow)
+    created = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __rep__(self):
+        return '<Template %r>' % self.id
 
 
 
@@ -71,29 +80,29 @@ class Purchased_modules(db.Model):
 def index():
     return render_template('index.html')
 
-#devuelve la lista de las empresas asociadas
-@app.route('/api/business/list', methods=['GET'])
-def call_business_list():
-    data = Business.query.order_by(Business.created).all()
-    r = []
-    #print(data[0].name)
-    for business in data:
-        d = business.__dict__
-        del d['_sa_instance_state'] #elimina valor
-        d["created"] = str(d["created"]) #convierte valor datetime a string
-        r.append(d)
-    print("\n\nRESULT - ", "call_business_list","\n",r, "\n\n")
-    return jsonify(data=r)
 
 #devuelve el detalle de la empresa
-@app.route('/api/business/detail/<int:id>', methods=['GET'])
+@app.route('/api/business/<int:id>', methods=['GET'])
 def call_business_detail():
     return "call_business_detail"
 
+#devuelve la lista de las empresas asociadas
 #agrega una nueva empresa
-@app.route('/api/business/add', methods=['POST'])
-def call_business_add():
-    if request.method == 'POST':
+@app.route('/api/business', methods=['GET','POST'])
+def call_business():
+    if request.method == 'GET':
+        data = Business.query.order_by(Business.created).all()
+        r = []
+        #print(data[0].name)
+        for business in data:
+            d = business.__dict__
+            del d['_sa_instance_state'] #elimina valor
+            d["created"] = str(d["created"]) #convierte valor datetime a string
+            r.append(d)
+        print("\n\nRESULT - ", "call_business_list","\n",r, "\n\n")
+        return jsonify(data=r)
+
+    elif request.method == 'POST':
         res = request.json
         print(res)
 
@@ -115,7 +124,7 @@ def call_business_add():
         
         data = Business(
             name=res["name"], 
-            type_id=0,
+            type_id=res["type_id"],
             manager_id=db_manager[-1].id)
         
         try:
@@ -128,24 +137,84 @@ def call_business_add():
     return "ERROR REQUEST"
 
 #devuelve la lista de modulos por empresa
-@app.route('/api/business/list_modules/<int:id>', methods=['GET'])
+@app.route('/api/business/modules/<int:id>', methods=['GET'])
 def call_business_list_modules():
     return "call_business_list_modules"
 
 #devuelve la lista de modulos existentes
-@app.route('/api/modules/list', methods=['GET'])
-def call_modules_list():
-    return "call_modules_list"
+#agrega un nuevo modulo
+@app.route('/api/modules', methods=['GET','POST'])
+def call_modules():
+
+    if request.method == 'GET':
+        data = Modules.query.all()
+        r = []
+        #print(data[0].name)
+        for module in data:
+            d = module.__dict__
+            del d['_sa_instance_state'] #elimina valor
+            d["last_update"] = str(d["last_update"])
+            d["created"] = str(d["created"]) #convierte valor datetime a string
+            r.append(d)
+        print("\n\nRESULT - ", "call_modules","\n",r, "\n\n")
+        return jsonify(data=r)
+
+    elif request.method == 'POST':
+        res = request.json
+        print(res)
+        
+        data =Modules(
+            name=res["name"],
+            status=res["status"])
+
+        try:
+            db.session.add(data)
+            db.session.commit()
+            return jsonify(result="SAVE SUCCESS")
+        except:
+            return jsonify(result="SAVE ERROR MODULE")
+
+        
+    return "ERROR REQUEST"
 
 #devuelve el detalle del modulo
-@app.route('/api/modules/detail/<int:id>', methods=['GET'])
+@app.route('/api/modules/<int:id>', methods=['GET'])
 def call_modules_detail():
     return "call_modules_detail"
 
 #devuelve la lista de plantillas de estilos
-@app.route('/api/template/list', methods=['GET'])
-def call_template_list():
-    return "call_template_list"
+@app.route('/api/template', methods=['GET', 'POST'])
+def call_template():
+    if request.method == 'GET':
+        data = Template.query.all()
+        r = []
+        #print(data[0].name)
+        for template in data:
+            d = template.__dict__
+            del d['_sa_instance_state'] #elimina valor
+            d["last_update"] = str(d["last_update"])
+            d["created"] = str(d["created"]) #convierte valor datetime a string
+            r.append(d)
+        print("\n\nRESULT - ", "call_template","\n",r, "\n\n")
+        return jsonify(data=r)
+
+    elif request.method == 'POST':
+        res = request.json
+        print(res)
+        
+        data =Template(
+            name=res["name"],
+            status=res["status"])
+
+        try:
+            db.session.add(data)
+            db.session.commit()
+            return jsonify(result="SAVE SUCCESS")
+        except:
+            return jsonify(result="SAVE ERROR TEMPLATE")
+
+        
+    return "ERROR REQUEST"
 
 
 if __name__ == "__main__":
