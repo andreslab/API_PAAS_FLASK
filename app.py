@@ -59,7 +59,7 @@ class Purchased_modules(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     module_id = db.Column(db.Integer, nullable=False)
     business_id = db.Column(db.Integer, nullable=False)
-    is_activate = db.Column(db.Integer, nullable=False)
+    is_activate = db.Column(db.Integer, default=True)
     created = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __rep__(self):
@@ -138,9 +138,37 @@ def call_business():
     return "ERROR REQUEST"
 
 #devuelve la lista de modulos por empresa
-@app.route('/api/business/modules/<int:id>', methods=['GET'])
-def call_business_list_modules():
-    return "call_business_list_modules"
+@app.route('/api/business/modules/<int:b_id>', methods=['GET', 'POST'])
+def call_business_list_modules(b_id):
+    if request.method == 'GET':
+        data = Purchased_modules.query.filter_by(business_id=b_id)
+        r = []
+        #print(data[0].name)
+        for module in data:
+            d = module.__dict__
+            del d['_sa_instance_state'] #elimina valor
+            d["created"] = str(d["created"]) #convierte valor datetime a string
+            r.append(d)
+        print("\n\nRESULT - ", "call_purchased_modules","\n",r, "\n\n")
+        return jsonify(data=r)
+
+    elif request.method == 'POST':
+        res = request.json
+        print(res)
+        
+        data = Purchased_modules(
+            module_id=res["module_id"],
+            business_id=res["business_id"],)
+
+        try:
+            db.session.add(data)
+            db.session.commit()
+            return jsonify(result="SAVE SUCCESS")
+        except:
+            return jsonify(result="SAVE ERROR MODULE BUSINESS")
+
+        
+    return "ERROR REQUEST"
 
 #devuelve la lista de modulos existentes
 #agrega un nuevo modulo
