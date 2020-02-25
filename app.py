@@ -107,6 +107,11 @@ def call_business():
         res = request.json
         print(res)
 
+        #verify if exists
+        data_verify_not_repeat = Business.query.filter_by(name=res["name"])
+        if data_verify_not_repeat.first() is not None:
+            return jsonify(result="BUSINESS EXITED")
+
         manager = res["manager"]
         data_manager =Managers(
             name=manager["name"], 
@@ -155,12 +160,22 @@ def call_business_list_modules(b_id):
     elif request.method == 'POST':
         res = request.json
         print(res)
+
+         #verify if business has module
+        data_verify_not_repeat = Purchased_modules.query.filter_by(business_id=res["business_id"],module_id=res["module_id"])
+        if data_verify_not_repeat.first() is not None:
+            return jsonify(result="BUSINESS HAS MODULE")
         
         data = Purchased_modules(
             module_id=res["module_id"],
             business_id=res["business_id"],)
 
+        #update business data
+        update_business = Business.query.filter_by(id=res["business_id"]).first()
+        update_business.num_modules += 1
+
         try:
+            db.session.add(update_business)
             db.session.add(data)
             db.session.commit()
             return jsonify(result="SAVE SUCCESS")
@@ -191,6 +206,11 @@ def call_modules():
     elif request.method == 'POST':
         res = request.json
         print(res)
+
+        #verify if exists
+        data_verify_not_repeat = Modules.query.filter_by(name=res["name"])
+        if data_verify_not_repeat.first() is not None:
+            return jsonify(result="MODULE EXITED")
         
         data =Modules(
             name=res["name"],
