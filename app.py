@@ -1,8 +1,11 @@
-from flask import Flask, render_template, request, jsonify
+import os
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import json
 from flask_cors import CORS
+from pymongo import MongoClient
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 CORS(app)
@@ -12,7 +15,16 @@ cors = CORS(app, resouse={
     }
 })
 
+UPLOAD_FOLDER = './path/uploads'
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'zip'}
+
+#database mongo as cache
+clientMongo = MongoClient('localhost',port=27017)
+dbMongo = clientMongo["BUSINESS"] #la crea si no esta creada
+
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db_paas.db'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 #app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 db = SQLAlchemy(app)
 
@@ -26,6 +38,12 @@ class Business(db.Model):
 
     def __rep__(self):
         return '<Business %r>' % self.name
+
+class Auth(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user = db.Column(db.String(10), nullable=False)
+    password = db.Column(db.String(10), nullable=False)
+    business_id = db.Column(db.Integer, nullable=False)
 
 class Business_type(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -87,6 +105,43 @@ def index():
 def call_business_detail():
     return "call_business_detail"
 
+#verifica a usuarios
+@app.route('/api/auth', methods=['POST'])
+def call_auth():
+    if request.method == 'POST':
+        res = request.json
+        print(res)
+        data = Auth.query.filter_by(name=res["user"])
+        user = data.user
+        password = data.password
+
+        if(res["pass"] == password):
+            print("LOGIN ACCESS")
+
+            business = Business.query.filter_by(id=data.business_id)
+
+            modules = []
+            col = dbMongo[business.name]
+            #documentos = modulos (plugins)
+            for module in col.find({}):
+                print(module)
+                modules.append(module)
+
+            resp = business.__dict__
+            del resp['_sa_instance_state'] #elimina valor
+            resp["created"] = str(resp["created"]) #convierte valor datetime a string
+            resp["modules"] = module
+
+            print("\n\nRESULT - ", "call_auth","\n",resp, "\n\n")
+            return jsonify(data=resp)
+
+        
+    return "ERROR REQUEST"
+
+#devuelve datos de configuración
+
+
+
 #devuelve la lista de las empresas asociadas
 #agrega una nueva empresa
 @app.route('/api/business', methods=['GET','POST'])
@@ -128,13 +183,19 @@ def call_business():
 
         db_manager = Managers.query.order_by(Managers.created).all()
         
-        data = Business(
+        data_business = Business(
             name=res["name"], 
             type_id=res["type_id"],
             manager_id=db_manager[-1].id)
+
+        data_auth = Auth(
+            user=res["user"],
+            password=res["pass"]
+        )
         
         try:
-            db.session.add(data)
+            db.session.add(data_business)
+            db.session.add(data_auth)
             db.session.commit()
             return jsonify(result="SAVE SUCCESS")
         except:
@@ -171,11 +232,36 @@ def call_business_list_modules(b_id):
             business_id=res["business_id"],)
 
         #update business data
-        update_business = Business.query.filter_by(id=res["business_id"]).first()
-        update_business.num_modules += 1
+        data_business = Business.query.filter_by(id=res["business_id"]).first()
+        data_business.num_modules += 1
+
+        #get data module
+        data_module = Modules.query.filter_by(id=res["module_id"]).first()
+
+        #add module in cache database
+        col = dbMongo[data_business.name]
+        col.insert_one({
+            "name": data_module.name,
+            "buy_date": "12-12-20",
+        })
+
+        '''col.insert_many([
+            {
+            "name": "registro",
+            "buy_date": "12-08-20",
+            },
+            {
+                "name": "registro",
+                "buy_date": "12-08-20",
+            }
+        ])'''
+
+        print(clientMongo.list_database_names())
+        print(dbMongo.list_collection_names())
+        #print(col.count_documents())
 
         try:
-            db.session.add(update_business)
+            db.session.add(data_business)
             db.session.add(data)
             db.session.commit()
             return jsonify(result="SAVE SUCCESS")
@@ -264,6 +350,42 @@ def call_template():
 
         
     return "ERROR REQUEST"
+
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/api/modules/upload', methods=['GET', 'POST'])
+def upload_file():
+    if request.method == 'POST':
+        # check if the post request has the file part
+        if 'file' not in request.files:
+            flash('No file part')
+            return redirect(request.url)
+        file = request.files['file']
+        print(file.filename)
+        # if user does not select file, browser also
+        # submit an empty part without filename
+        if file.filename == '':
+            flash('No selected file')
+            return redirect(request.url)
+        print(file.filename)
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            #return redirect(url_for('uploaded_file',filename=filename))
+            return jsonify(result="SAVE FILE")
+
+    return jsonify(data='''
+    <!doctype html>
+    <title>Upload new File</title>
+    <h1>Upload new File</h1>
+    <form method=post enctype=multipart/form-data>
+      <input type=file name=file>
+      <input type=submit value=Upload>
+    </form>
+    ''')
 
 
 if __name__ == "__main__":
